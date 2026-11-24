@@ -7,6 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")  # load the API key BEFORE creating the OpenAI client
 
 from fastapi import Body, FastAPI, HTTPException, Query  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from model.book import BookMatch  # noqa: E402
 from service.book_service import BookNotFoundError, BookService  # noqa: E402
@@ -29,9 +30,9 @@ app = FastAPI(title="Book Recommendation API", lifespan=lifespan)
 
 
 @app.get("/api/books")
-def list_books() -> list[str]:
-    """All book titles."""
-    return [b.title for b in book_service.books]
+def list_books() -> list[dict[str, str]]:
+    """All books (title + description) - used by the frontend's 'All books' row."""
+    return [{"title": b.title, "description": b.description} for b in book_service.books]
 
 
 @app.post("/api/books/search")
@@ -55,6 +56,11 @@ def similar(
         return book_service.similar_books(title, top_k)
     except BookNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# Frontend: serves static/index.html at http://127.0.0.1:8004/
+# Mounted LAST so the /api/... routes above are matched first.
+app.mount("/", StaticFiles(directory=BASE_DIR / "static", html=True), name="frontend")
 
 
 # Lets the green ▶ Run button start the server on port 8004
